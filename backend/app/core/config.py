@@ -31,11 +31,20 @@ class Settings(BaseSettings):
     DEADMAN_SCHEDULER_ENABLED: bool = True
 
     # Liveness / reconhecimento facial
-    # "stub" (PoC, sempre aprova) | "aws_rekognition"
+    # "stub" (PoC) | "serpro_datavalid" | "aws_rekognition"
     LIVENESS_PROVIDER: str = "stub"
     FACE_MATCH_THRESHOLD: float = 0.90       # similaridade mínima [0..1]
     LIVENESS_THRESHOLD: float = 0.80         # confiança de prova de vida [0..1]
     AWS_REGION: str = "sa-east-1"
+
+    # Serpro Datavalid (validação facial contra a base oficial do governo)
+    # Credenciais na Área do Cliente do Serpro. NÃO versione.
+    DATAVALID_BASE_URL: str = "https://gateway.apiserpro.serpro.gov.br"
+    DATAVALID_TOKEN_PATH: str = "/token"
+    DATAVALID_FACE_PATH: str = "/datavalid/v4/pf-facial"  # confirme no seu contrato
+    DATAVALID_CONSUMER_KEY: str = ""
+    DATAVALID_CONSUMER_SECRET: str = ""
+    DATAVALID_TIMEOUT_SECONDS: float = 20.0
 
     # Webhook da central (homem-morto perdido, pânico)
     CENTRAL_WEBHOOK_URL: str = ""

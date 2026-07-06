@@ -24,6 +24,7 @@ def run() -> None:
         op = User(name="Central Operador", email="operador@wfm.local",
                   hashed_password=hash_password("senha123"), role=Role.operator)
         guard = User(name="João da Silva", email="guarda@wfm.local",
+                     cpf="25774435016",  # placeholder; Datavalid valida contra a base por CPF
                      hashed_password=hash_password("senha123"), role=Role.employee,
                      face_embedding="[0.11,0.22,0.33]",  # placeholder do vetor base
                      consent_version="v1", consent_granted_at=utcnow())

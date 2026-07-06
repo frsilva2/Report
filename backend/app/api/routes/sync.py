@@ -46,7 +46,8 @@ def sync_offline(payload: OfflineSyncRequest, db: Session = Depends(get_db), use
             # Revalida liveness se a selfie veio no lote; senão marca p/ revisão humana.
             if item.selfie_base64:
                 try:
-                    face = provider.verify(base64.b64decode(item.selfie_base64), user.face_embedding)
+                    face = provider.verify(base64.b64decode(item.selfie_base64),
+                                           cpf=user.cpf, base_embedding=user.face_embedding)
                     if (face.liveness_score < settings.LIVENESS_THRESHOLD
                             or face.match_score < settings.FACE_MATCH_THRESHOLD):
                         status_, reason = CheckStatus.rejected, "biometria reprovada"

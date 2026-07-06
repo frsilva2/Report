@@ -77,10 +77,29 @@ Ver `backend/app/models/models.py`. Entidades principais:
   3. **Plausibilidade server-side**: velocidade implícita entre dois check-ins; "teletransporte" = rejeitado. *É a defesa que funciona mesmo no navegador.*
 
 ### 4.2 Reconhecimento facial + liveness
-- Selfie no check-in/out → `LivenessProvider.verify()`.
-- Produção: AWS Rekognition — `create_face_liveness_session` (cliente conduz o desafio via SDK Amplify) → `get_face_liveness_session_results` (Confidence) → `compare_faces` (Similarity).
+- Selfie no check-in/out → `LivenessProvider.verify(selfie, cpf=..., base_embedding=...)`.
+- Provedores plugáveis por `LIVENESS_PROVIDER` (nenhuma rota muda ao trocar):
+  - `stub` — PoC.
+  - `serpro_datavalid` — **valida contra a base oficial do governo** (Senatran) por CPF; o fluxo `v4/pf-facial` já contempla prova de vida na captura. Ver `services/datavalid.py`.
+  - `aws_rekognition` — liveness gerenciado (⚠️ não roda em sa-east-1; dado sai do BR).
 - Thresholds configuráveis (`LIVENESS_THRESHOLD`, `FACE_MATCH_THRESHOLD`).
 - **LGPD:** a selfie do check-in **não é persistida** — guardamos só os scores.
+
+#### Estratégia de custo com Datavalid (recomendada)
+Datavalid é cobrado **por consulta** — usar em todo ponto diário (ex.: 300
+pessoas × 2/dia ≈ 15,6 mil/mês) fica caro. Separe as camadas:
+
+1. **Onboarding (1× por pessoa):** `serpro_datavalid` valida o rosto contra a
+   base oficial → prova forte de "é quem diz ser". ~300 consultas únicas (cabe
+   no tier gratuito). Guarde o resultado/embedding aprovado.
+2. **Check-in diário:** faça match contra a referência aprovada no onboarding
+   (matcher barato/self-hosted) + prova de vida; use Datavalid de novo só em
+   **check-ins de risco** ou revalidação periódica.
+
+**Auth Datavalid:** OAuth2 `client_credentials` em `/token` (Basic com Consumer
+Key/Secret; Bearer válido ~1h, com cache no cliente). Resposta da validação é um
+**JWS** com `face_similaridade`. Em produção, **verifique a assinatura** do JWS
+com a chave pública do Serpro.
 
 ### 4.3 Sensor de homem-morto (check-in periódico)
 - Ao iniciar turno, agenda-se um `DeadManChallenge` a cada **30 min ± jitter aleatório** (evita virar hábito).

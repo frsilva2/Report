@@ -101,7 +101,7 @@ async def check_in(
 
     # 4) Liveness + reconhecimento facial.
     selfie_bytes = await selfie.read()
-    face = get_liveness_provider().verify(selfie_bytes, user.face_embedding)
+    face = get_liveness_provider().verify(selfie_bytes, cpf=user.cpf, base_embedding=user.face_embedding)
     if face.liveness_score < settings.LIVENESS_THRESHOLD:
         return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
                        is_mock_location, is_rooted,
