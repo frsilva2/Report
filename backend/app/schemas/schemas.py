@@ -57,6 +57,13 @@ class CheckinRequest(BaseModel):
     # selfie enviada como multipart (arquivo), não aqui — ver rota.
 
 
+class LivenessChallengeOut(BaseModel):
+    nonce: str
+    actions: list[str]      # ex.: ["blink", "turn_left"]
+    deadline_at: datetime
+    window_seconds: int
+
+
 class CheckinResult(BaseModel):
     status: str                 # approved | rejected | pending_review
     check_event_id: int | None = None

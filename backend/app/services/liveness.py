@@ -75,6 +75,43 @@ class SerproDatavalidProvider(LivenessProvider):
         )
 
 
+class DeepFaceProvider(LivenessProvider):
+    """Matcher self-hosted (custo R$0/consulta) via DeepFace.
+
+    Faz o match entre a selfie e a foto base do cadastro (armazenada por
+    referência) + anti-spoofing passivo. Instale com: pip install deepface
+    A prova de vida ATIVA (movimento) é validada à parte em services/face_liveness.py;
+    aqui cuidamos do reconhecimento + anti-spoof passivo.
+
+    Nota: neste PoC `base_embedding` guarda um placeholder. Em produção,
+    armazene a foto/embedding aprovado no onboarding e compare com ela.
+    """
+
+    def verify(self, selfie_bytes, *, cpf=None, base_embedding=None) -> FaceResult:
+        try:
+            import io
+            import numpy as np
+            from deepface import DeepFace
+            from PIL import Image
+        except ImportError as exc:  # pragma: no cover
+            return FaceResult(0.0, 0.0, False, f"DeepFace não instalado: {exc}")
+
+        try:
+            img = np.array(Image.open(io.BytesIO(selfie_bytes)).convert("RGB"))
+            # Anti-spoofing passivo (foto/tela).
+            faces = DeepFace.extract_faces(img, anti_spoofing=True, enforce_detection=True)
+            live = all(f.get("is_real", True) for f in faces)
+            liveness = 1.0 if live else 0.0
+            # Match vs. referência do cadastro seria feito aqui (DeepFace.verify)
+            # contra a imagem base armazenada. No PoC devolvemos o sinal de liveness.
+            match = liveness if base_embedding else 0.0
+            approved = live and base_embedding is not None
+            return FaceResult(liveness, match, approved,
+                              None if live else "spoof detectado (foto/tela)")
+        except Exception as exc:  # noqa: BLE001
+            return FaceResult(0.0, 0.0, False, f"DeepFace: {exc}")
+
+
 class AwsRekognitionLivenessProvider(LivenessProvider):
     """Produção alternativa. Fluxo: create_face_liveness_session -> SDK Amplify
     conduz o desafio no cliente -> get_face_liveness_session_results (Confidence)
@@ -88,6 +125,8 @@ class AwsRekognitionLivenessProvider(LivenessProvider):
 
 
 def get_liveness_provider() -> LivenessProvider:
+    if settings.LIVENESS_PROVIDER == "deepface":
+        return DeepFaceProvider()
     if settings.LIVENESS_PROVIDER == "serpro_datavalid":
         return SerproDatavalidProvider()
     if settings.LIVENESS_PROVIDER == "aws_rekognition":

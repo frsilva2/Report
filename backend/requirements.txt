@@ -9,6 +9,10 @@ bcrypt==4.0.1
 python-multipart==0.0.20
 apscheduler==3.11.0
 httpx==0.28.1
+# Matcher facial self-hosted (LIVENESS_PROVIDER=deepface). Pesado (~torch/tf):
+# deepface==0.0.93
+# pillow==11.0.0
+
 # Produção (VPS Hostinger): descomente para PostgreSQL + PostGIS
 # psycopg2-binary==2.9.10
 # geoalchemy2==0.16.0

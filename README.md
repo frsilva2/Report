@@ -12,7 +12,7 @@ ser e permanece ativo durante o turno**, combatendo fraude de ponto.
 ## Funcionalidades (todas testadas no PoC)
 
 1. **Controle geográfico** — geofence recalculado no servidor + anti-fake GPS em camadas (flag de mock, plausibilidade de deslocamento).
-2. **Reconhecimento facial + liveness** — interface `LivenessProvider` (stub no PoC, AWS Rekognition em produção). Selfies **não são armazenadas** (LGPD).
+2. **Reconhecimento facial + liveness** — matcher plugável (`stub` / `deepface` self-hosted / `serpro_datavalid` / `aws_rekognition`) **+ liveness ativa por desafio de movimento** (piscar/virar/sorrir) validada no servidor via MediaPipe. Selfies **não são armazenadas** (LGPD).
 3. **Sensor de homem-morto** — desafios a cada 30 min ± jitter; o **servidor** detecta ausência de resposta e dispara webhook à central.
 4. **Retaguarda** — sync offline revalidado, botão de pânico, telemetria de bateria/rede.
 

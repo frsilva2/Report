@@ -13,7 +13,10 @@ button.ghost { background:#334155; color:var(--fg); }
 button.panic { background:var(--danger); color:#fff; font-size:1.1rem; }
 .row { display:flex; gap:8px; align-items:center; justify-content:space-between; }
 .row button { width:auto; flex:1; }
-.video-wrap { margin:10px 0; }
+.video-wrap { margin:10px 0; position:relative; }
+.challenge { position:absolute; left:0; right:0; bottom:0; padding:10px;
+  background:rgba(6,78,59,.92); color:#fff; text-align:center; font-weight:600;
+  border-bottom-left-radius:12px; border-bottom-right-radius:12px; }
 video { width:100%; border-radius:12px; background:#000; aspect-ratio:4/3; object-fit:cover; }
 .geo { font-family: monospace; font-size:.85rem; background:#0b1220; padding:8px; border-radius:8px; }
 .msg { margin-top:10px; font-size:.9rem; min-height:1.2em; }

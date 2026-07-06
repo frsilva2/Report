@@ -31,11 +31,27 @@ class Settings(BaseSettings):
     DEADMAN_SCHEDULER_ENABLED: bool = True
 
     # Liveness / reconhecimento facial
-    # "stub" (PoC) | "serpro_datavalid" | "aws_rekognition"
+    # "stub" (PoC) | "deepface" | "serpro_datavalid" | "aws_rekognition"
     LIVENESS_PROVIDER: str = "stub"
     FACE_MATCH_THRESHOLD: float = 0.90       # similaridade mínima [0..1]
     LIVENESS_THRESHOLD: float = 0.80         # confiança de prova de vida [0..1]
     AWS_REGION: str = "sa-east-1"
+
+    # DeepFace (matcher self-hosted, custo R$0/consulta)
+    DEEPFACE_MODEL: str = "ArcFace"
+    DEEPFACE_DETECTOR: str = "opencv"
+
+    # Liveness ATIVA por desafio de movimento (validada no servidor)
+    REQUIRE_LIVENESS_CHALLENGE: bool = True
+    # Pool de ações e quantas sortear por desafio.
+    LIVENESS_ACTIONS: str = "blink,turn_left,turn_right,smile"
+    LIVENESS_ACTIONS_PER_CHALLENGE: int = 2
+    LIVENESS_CHALLENGE_WINDOW_SECONDS: int = 30
+    # Limiares das métricas (blendshapes/landmarks MediaPipe) que provam cada ação.
+    # blink/smile usam blendshapes do MediaPipe (0..1); yaw vem dos landmarks (graus).
+    LIVENESS_BLINK_MIN: float = 0.45         # score de olho fechado acima disso = piscou
+    LIVENESS_TURN_YAW_DEG: float = 18.0      # |yaw| acima disso = virou a cabeça
+    LIVENESS_SMILE_MIN: float = 0.55         # score de sorriso mínimo
 
     # Serpro Datavalid (validação facial contra a base oficial do governo)
     # Credenciais na Área do Cliente do Serpro. NÃO versione.

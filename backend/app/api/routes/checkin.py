@@ -5,10 +5,12 @@ Pipeline de validação (tudo server-side; o cliente não decide nada):
     1. Anti-Fake GPS   -> rejeita se mock/root reportado pelo device
     2. Geofence        -> recalcula distância ao posto; rejeita se fora do raio X
     3. Plausibilidade  -> rejeita 'teletransporte' vs. último evento (fake GPS server-side)
-    4. Liveness+Face   -> selfie precisa passar prova de vida e bater com a foto base
-    5. Persiste + (se check-in) ativa o turno e agenda o homem-morto
+    4. Liveness ativa  -> valida o desafio de movimento (piscar/virar) no servidor
+    5. Liveness+Face   -> selfie passa anti-spoof passivo e bate com a referência
+    6. Persiste + (se check-in) ativa o turno e agenda o homem-morto
 """
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
@@ -18,15 +20,57 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.models import (
-    CheckEvent, CheckStatus, CheckType, Shift, ShiftStatus, Site, User,
+    CheckEvent, CheckStatus, CheckType, LivenessChallenge, Shift, ShiftStatus, Site, User,
 )
 from app.models.models import ensure_aware, utcnow
-from app.schemas.schemas import CheckinResult
-from app.services import geofencing
+from app.schemas.schemas import CheckinResult, LivenessChallengeOut
+from app.services import face_liveness, geofencing
 from app.services.deadman import schedule_next_challenge
 from app.services.liveness import get_liveness_provider
 
 router = APIRouter(prefix="/api/checkin", tags=["checkin"])
+
+
+@router.post("/challenge", response_model=LivenessChallengeOut)
+def issue_challenge(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Emite um desafio de prova de vida ativa (sequência aleatória de ações)."""
+    actions = face_liveness.new_actions()
+    deadline = utcnow() + timedelta(seconds=settings.LIVENESS_CHALLENGE_WINDOW_SECONDS)
+    ch = LivenessChallenge(
+        user_id=user.id, nonce=face_liveness.new_nonce(),
+        actions=",".join(actions), deadline_at=deadline,
+    )
+    db.add(ch)
+    db.commit()
+    db.refresh(ch)
+    return LivenessChallengeOut(
+        nonce=ch.nonce, actions=actions, deadline_at=ch.deadline_at,
+        window_seconds=settings.LIVENESS_CHALLENGE_WINDOW_SECONDS,
+    )
+
+
+def _validate_liveness_challenge(db: Session, user: User, nonce: str | None,
+                                 evidence_raw: str | None) -> str | None:
+    """Retorna None se OK, ou uma string com o motivo da rejeição."""
+    if not settings.REQUIRE_LIVENESS_CHALLENGE:
+        return None
+    if not nonce:
+        return "desafio de prova de vida ausente"
+    ch = db.scalars(select(LivenessChallenge).where(LivenessChallenge.nonce == nonce)).first()
+    if not ch or ch.user_id != user.id:
+        return "desafio inválido"
+    if ch.consumed:
+        return "desafio já utilizado"
+    if utcnow() > ensure_aware(ch.deadline_at):
+        return "desafio expirado"
+    try:
+        evidence = json.loads(evidence_raw) if evidence_raw else {}
+    except json.JSONDecodeError:
+        return "evidência de movimento ilegível"
+    result = face_liveness.validate_evidence(ch.actions.split(","), evidence)
+    ch.consumed = True  # uso único, mesmo se falhar (evita brute force da evidência)
+    db.commit()
+    return None if result.ok else f"prova de vida falhou: {result.reason}"
 
 
 def _last_event(db: Session, user_id: int) -> CheckEvent | None:
@@ -62,6 +106,8 @@ async def check_in(
     is_mock_location: bool = Form(False),
     is_rooted: bool = Form(False),
     device_info: str | None = Form(None),
+    challenge_nonce: str | None = Form(None),
+    challenge_evidence: str | None = Form(None),
     selfie: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -99,7 +145,13 @@ async def check_in(
                        is_mock_location, is_rooted,
                        "Deslocamento fisicamente impossível desde o último registro", device_info)
 
-    # 4) Liveness + reconhecimento facial.
+    # 4) Prova de vida ATIVA (desafio de movimento validado no servidor).
+    challenge_error = _validate_liveness_challenge(db, user, challenge_nonce, challenge_evidence)
+    if challenge_error:
+        return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
+                       is_mock_location, is_rooted, challenge_error, device_info)
+
+    # 5) Liveness passiva + reconhecimento facial.
     selfie_bytes = await selfie.read()
     face = get_liveness_provider().verify(selfie_bytes, cpf=user.cpf, base_embedding=user.face_embedding)
     if face.liveness_score < settings.LIVENESS_THRESHOLD:
@@ -110,7 +162,7 @@ async def check_in(
         return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
                        is_mock_location, is_rooted, "Rosto não confere com o cadastro", device_info)
 
-    # 5) Aprovado — persiste. NÃO guardamos a selfie (minimização LGPD), só os scores.
+    # 6) Aprovado — persiste. NÃO guardamos a selfie (minimização LGPD), só os scores.
     ev = CheckEvent(
         user_id=user.id, site_id=site.id, type=ctype, status=CheckStatus.approved,
         latitude=latitude, longitude=longitude, accuracy_m=accuracy_m, distance_m=dist,

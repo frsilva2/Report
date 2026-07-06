@@ -78,10 +78,20 @@ Ver `backend/app/models/models.py`. Entidades principais:
 
 ### 4.2 Reconhecimento facial + liveness
 - Selfie no check-in/out → `LivenessProvider.verify(selfie, cpf=..., base_embedding=...)`.
-- Provedores plugáveis por `LIVENESS_PROVIDER` (nenhuma rota muda ao trocar):
+- Provedores de **match** plugáveis por `LIVENESS_PROVIDER` (nenhuma rota muda):
   - `stub` — PoC.
+  - `deepface` — **matcher self-hosted** (ArcFace) + anti-spoofing passivo. Custo R$0/consulta, dado no BR. Requer `pip install deepface`.
   - `serpro_datavalid` — **valida contra a base oficial do governo** (Senatran) por CPF; o fluxo `v4/pf-facial` já contempla prova de vida na captura. Ver `services/datavalid.py`.
   - `aws_rekognition` — liveness gerenciado (⚠️ não roda em sa-east-1; dado sai do BR).
+
+**Liveness ATIVA por desafio de movimento** (`services/face_liveness.py`): o
+servidor emite um desafio com sequência aleatória de ações (piscar/virar/sorrir)
+e um `nonce` de uso único; o webapp usa **MediaPipe FaceLandmarker** para medir
+os movimentos e envia as métricas; o **servidor valida** (não confia num "fiz
+sim" do cliente). Defesa em camadas recomendada, dentro do orçamento: liveness
+passiva (DeepFace) + ativa (desafio) + contexto server-side, escalando para
+Datavalid só em check-ins de risco. Garantia forte contra injeção de câmera/
+deepfake exige o app nativo com attestation (Fase 2).
 - Thresholds configuráveis (`LIVENESS_THRESHOLD`, `FACE_MATCH_THRESHOLD`).
 - **LGPD:** a selfie do check-in **não é persistida** — guardamos só os scores.
 

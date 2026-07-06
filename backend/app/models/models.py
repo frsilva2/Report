@@ -153,6 +153,21 @@ class DeadManChallenge(Base):
     webhook_fired: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class LivenessChallenge(Base):
+    """Desafio de prova de vida ativa (sequência de ações). Emitido pelo servidor,
+    de uso único e com prazo. O cliente executa e envia as métricas de movimento;
+    o servidor valida (não confia num 'fiz sim' do cliente)."""
+    __tablename__ = "liveness_challenges"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    nonce: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    actions: Mapped[str] = mapped_column(String(120))  # csv, ex.: "blink,turn_left"
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    deadline_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class PanicAlert(Base):
     __tablename__ = "panic_alerts"
 
