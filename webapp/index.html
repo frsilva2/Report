@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WFM — Check-in de Campo (PoC)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <h1>WFM · Check-in</h1>
+    <p class="warn">
+      ⚠️ PoC web: o navegador <b>não detecta Fake GPS</b> nem roda o homem-morto
+      confiável em background. A validação forte é server-side; garantias completas
+      exigem o app nativo (fase 2).
+    </p>
+
+    <!-- Login -->
+    <section id="loginCard" class="card">
+      <h2>Entrar</h2>
+      <input id="email" placeholder="email" value="guarda@wfm.local" />
+      <input id="password" type="password" placeholder="senha" value="senha123" />
+      <button id="loginBtn">Entrar</button>
+      <div id="loginMsg" class="msg"></div>
+    </section>
+
+    <!-- Check-in -->
+    <section id="mainCard" class="card hidden">
+      <div class="row">
+        <span id="who"></span>
+        <button id="logoutBtn" class="ghost">sair</button>
+      </div>
+
+      <label>Posto</label>
+      <select id="siteSelect"></select>
+
+      <div class="video-wrap">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas" class="hidden"></canvas>
+      </div>
+
+      <div id="geo" class="geo">📍 obtendo localização…</div>
+
+      <div class="row">
+        <button id="checkinBtn">✅ Check-in</button>
+        <button id="checkoutBtn" class="ghost">Check-out</button>
+      </div>
+      <button id="panicBtn" class="panic">🚨 PÂNICO</button>
+
+      <div id="result" class="msg"></div>
+
+      <!-- Homem-morto -->
+      <div id="deadman" class="deadman hidden">
+        <b>🟢 Você está alerta?</b>
+        <button id="ackBtn">Estou aqui</button>
+        <span id="deadmanTimer"></span>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

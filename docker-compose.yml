@@ -1,0 +1,21 @@
+# Infra de produção (VPS): PostgreSQL+PostGIS + Redis.
+# A API sobe via systemd/gunicorn no host, ou adicione um serviço 'api' aqui.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: wfm
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: wfm
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:

@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Ambiente / segredos
+.env
+*.env
+!.env.example
+
+# Banco local (PoC)
+*.db
+*.sqlite3
+
+# Sistema
+.DS_Store
+*.log
