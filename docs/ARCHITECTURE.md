@@ -68,6 +68,24 @@ Ver `backend/app/models/models.py`. Entidades principais:
 
 ## 4. As 4 funcionalidades essenciais
 
+### 4.0 Camadas anti-fraude no webapp (defense-in-depth)
+Como o navegador não detecta Fake GPS nem impede injeção de câmera, a defesa é
+empilhar camadas baratas e **decidir tudo no servidor**:
+
+| # | Camada | Onde |
+|---|---|---|
+| 1 | Servidor é a verdade (recalcula geofence, valida liveness, timing) | ✅ |
+| 2 | Selfie só capturada na sessão (sem upload de arquivo) | webapp |
+| 3 | Desafio de movimento aleatório + nonce de uso único | `face_liveness.py` |
+| 4 | Gate de qualidade do GPS (precisão + frescor do fix) | `checkin.py` |
+| 5 | Cruzamento GPS × IP (divergência grosseira → rejeita/flag) | `geoip.py` |
+| 8 | Janela de turno (check-in só dentro da escala) | `checkin.py` + `shifts.py` |
+| 9 | Anomalia: 1 check-in ativo por vez | `checkin.py` |
+| — | Auditoria total (aprovados e rejeitados com scores + IP) | `CheckEvent` |
+
+Teto: nada disso para injeção de câmera/deepfake — só **app nativo +
+attestation (Fase 2)**. No webapp, o objetivo é tornar a fraude cara e detectável.
+
 ### 4.1 Controle geográfico (geofencing + anti-fake GPS)
 - Cliente envia `lat/lon/accuracy` + sinais (`is_mock_location`, `is_rooted`).
 - Servidor **recalcula** distância (Haversine no PoC; `ST_DWithin` no PostGIS) e rejeita se `> radius_m`.

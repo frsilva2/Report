@@ -20,6 +20,26 @@ class UserOut(BaseModel):
         from_attributes = True
 
 
+# ---- Shifts (escala) ----
+class ShiftCreate(BaseModel):
+    user_id: int
+    site_id: int
+    scheduled_start: datetime
+    scheduled_end: datetime
+
+
+class ShiftOut(BaseModel):
+    id: int
+    user_id: int
+    site_id: int
+    status: str
+    scheduled_start: datetime | None = None
+    scheduled_end: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
 # ---- Sites ----
 class SiteCreate(BaseModel):
     name: str

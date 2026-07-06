@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db.session import Base, engine
-from app.api.routes import auth, checkin, deadman, panic, sites, sync, telemetry
+from app.api.routes import auth, checkin, deadman, panic, shifts, sites, sync, telemetry
 from app.services.deadman import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -32,7 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (auth, sites, checkin, deadman, panic, telemetry, sync):
+for r in (auth, sites, shifts, checkin, deadman, panic, telemetry, sync):
     app.include_router(r.router)
 
 

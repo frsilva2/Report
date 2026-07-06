@@ -100,6 +100,9 @@ class Shift(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), index=True)
     status: Mapped[ShiftStatus] = mapped_column(Enum(ShiftStatus), default=ShiftStatus.scheduled)
+    # Janela de escala (opcional). Usada para exigir check-in no horário certo (#8).
+    scheduled_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scheduled_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -133,6 +136,7 @@ class CheckEvent(Base):
 
     # Origem / auditoria
     device_info: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)  # #5 cruzamento GPS×IP
     synced_from_offline: Mapped[bool] = mapped_column(Boolean, default=False)
     client_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     server_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

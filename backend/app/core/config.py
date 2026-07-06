@@ -23,6 +23,19 @@ class Settings(BaseSettings):
     # Máx. deslocamento plausível entre dois check-ins (m/s). ~30 m/s ≈ 108 km/h.
     MAX_PLAUSIBLE_SPEED_MPS: float = 30.0
 
+    # #4 Gate de qualidade do GPS
+    MAX_GPS_ACCURACY_M: float = 100.0        # rejeita fix impreciso demais
+    MAX_FIX_AGE_SECONDS: int = 120           # rejeita posição "velha"/cacheada
+
+    # #5 Cruzamento GPS × IP (opcional; requer geoip2 + base GeoLite2)
+    GEOIP_ENABLED: bool = False
+    GEOIP_DB_PATH: str = ""
+    GEOIP_MAX_DIVERGENCE_KM: float = 200.0   # divergência acima disso = rejeita/flag
+
+    # #8 Janela de turno
+    REQUIRE_SHIFT_WINDOW: bool = False       # exige check-in dentro da escala
+    SHIFT_GRACE_MINUTES: int = 30            # tolerância antes/depois do horário
+
     # Homem-morto (dead man switch)
     DEADMAN_INTERVAL_MINUTES: int = 30
     DEADMAN_JITTER_MINUTES: int = 5          # variação aleatória ±5 min

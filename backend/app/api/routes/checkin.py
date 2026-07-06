@@ -12,7 +12,7 @@ Pipeline de validação (tudo server-side; o cliente não decide nada):
 import json
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -24,11 +24,35 @@ from app.models.models import (
 )
 from app.models.models import ensure_aware, utcnow
 from app.schemas.schemas import CheckinResult, LivenessChallengeOut
-from app.services import face_liveness, geofencing
+from app.services import face_liveness, geofencing, geoip
 from app.services.deadman import schedule_next_challenge
 from app.services.liveness import get_liveness_provider
 
 router = APIRouter(prefix="/api/checkin", tags=["checkin"])
+
+
+def _client_ip(request: Request) -> str | None:
+    """IP real do cliente (atrás de nginx use o 1º de X-Forwarded-For)."""
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
+def _find_scheduled_shift(db: Session, user_id: int, site_id: int, now: datetime) -> Shift | None:
+    """#8 Turno agendado cuja janela (± tolerância) contém `now`."""
+    grace = timedelta(minutes=settings.SHIFT_GRACE_MINUTES)
+    candidates = db.scalars(
+        select(Shift).where(
+            Shift.user_id == user_id, Shift.site_id == site_id,
+            Shift.status == ShiftStatus.scheduled,
+            Shift.scheduled_start.is_not(None),
+        )
+    ).all()
+    for s in candidates:
+        if ensure_aware(s.scheduled_start) - grace <= now <= ensure_aware(s.scheduled_end) + grace:
+            return s
+    return None
 
 
 @router.post("/challenge", response_model=LivenessChallengeOut)
@@ -82,12 +106,14 @@ def _last_event(db: Session, user_id: int) -> CheckEvent | None:
     ).first()
 
 
-def _reject(db, user, site, ctype, lat, lon, acc, dist, is_mock, is_rooted, reason, dev) -> CheckinResult:
+def _reject(db, user, site, ctype, lat, lon, acc, dist, is_mock, is_rooted, reason, dev,
+            ip=None) -> CheckinResult:
     """Persiste a tentativa rejeitada (auditoria) e retorna o resultado."""
     ev = CheckEvent(
         user_id=user.id, site_id=site.id, type=ctype, status=CheckStatus.rejected,
         rejection_reason=reason, latitude=lat, longitude=lon, accuracy_m=acc,
         distance_m=dist, is_mock_location=is_mock, is_rooted=is_rooted, device_info=dev,
+        client_ip=ip,
     )
     db.add(ev)
     db.commit()
@@ -109,6 +135,7 @@ async def check_in(
     challenge_nonce: str | None = Form(None),
     challenge_evidence: str | None = Form(None),
     selfie: UploadFile = File(...),
+    request: Request = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -117,39 +144,79 @@ async def check_in(
     if not site or not site.is_active:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Posto não encontrado")
 
+    ip = _client_ip(request) if request else None
+    now = utcnow()
     dist = geofencing.haversine_m(latitude, longitude, site.latitude, site.longitude)
+
+    # 0) Gate de qualidade do GPS (#4): precisão e frescor do fix.
+    if accuracy_m is not None and accuracy_m > settings.MAX_GPS_ACCURACY_M:
+        return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
+                       is_mock_location, is_rooted,
+                       f"GPS impreciso (±{accuracy_m:.0f} m > {settings.MAX_GPS_ACCURACY_M:.0f} m)",
+                       device_info, ip)
+    if client_timestamp is not None:
+        age = (now - ensure_aware(client_timestamp)).total_seconds()
+        if age > settings.MAX_FIX_AGE_SECONDS:
+            return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
+                           is_mock_location, is_rooted,
+                           f"Localização desatualizada ({age:.0f}s)", device_info, ip)
 
     # 1) Anti-Fake GPS (sinais do device). No webapp esses sinais são fracos/ausentes;
     #    por isso o passo 3 (plausibilidade) é a defesa real no navegador.
     if is_mock_location:
         return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
-                       is_mock_location, is_rooted, "Localização falsa (mock) detectada", device_info)
+                       is_mock_location, is_rooted, "Localização falsa (mock) detectada", device_info, ip)
     if is_rooted:
         return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
-                       is_mock_location, is_rooted, "Dispositivo comprometido (root/jailbreak)", device_info)
+                       is_mock_location, is_rooted, "Dispositivo comprometido (root/jailbreak)", device_info, ip)
 
     # 2) Geofence — recalculado no servidor.
     if dist > site.radius_m:
         return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
                        is_mock_location, is_rooted,
-                       f"Fora do raio permitido ({dist:.0f} m > {site.radius_m:.0f} m)", device_info)
+                       f"Fora do raio permitido ({dist:.0f} m > {site.radius_m:.0f} m)", device_info, ip)
 
     # 3) Plausibilidade de deslocamento vs. último evento aprovado.
     last = _last_event(db, user.id)
-    now = utcnow()
     if last and not geofencing.is_speed_plausible(
         last.latitude, last.longitude, ensure_aware(last.server_timestamp),
         latitude, longitude, now, settings.MAX_PLAUSIBLE_SPEED_MPS,
     ):
         return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
                        is_mock_location, is_rooted,
-                       "Deslocamento fisicamente impossível desde o último registro", device_info)
+                       "Deslocamento fisicamente impossível desde o último registro", device_info, ip)
+
+    # 3b) Cruzamento GPS × IP (#5): rejeita divergência grosseira (VPN/desktop/spoof).
+    if settings.GEOIP_ENABLED and ip:
+        ok, div = geoip.is_ip_gps_consistent(ip, latitude, longitude)
+        if not ok:
+            return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
+                           is_mock_location, is_rooted,
+                           f"GPS diverge do IP ({div:.0f} km)", device_info, ip)
+
+    # 3c) Anomalia (#9): já existe turno ativo? Não pode bater 2 check-ins ao mesmo tempo.
+    if ctype == CheckType.checkin:
+        active = db.scalar(select(Shift.id).where(
+            Shift.user_id == user.id, Shift.status == ShiftStatus.active))
+        if active:
+            return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
+                           is_mock_location, is_rooted,
+                           "Já existe um turno ativo — faça o check-out primeiro", device_info, ip)
+
+    # 3d) Janela de turno (#8): check-in só dentro da escala (± tolerância).
+    scheduled_shift = None
+    if ctype == CheckType.checkin and settings.REQUIRE_SHIFT_WINDOW:
+        scheduled_shift = _find_scheduled_shift(db, user.id, site.id, now)
+        if not scheduled_shift:
+            return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
+                           is_mock_location, is_rooted,
+                           "Fora da janela do turno agendado", device_info, ip)
 
     # 4) Prova de vida ATIVA (desafio de movimento validado no servidor).
     challenge_error = _validate_liveness_challenge(db, user, challenge_nonce, challenge_evidence)
     if challenge_error:
         return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
-                       is_mock_location, is_rooted, challenge_error, device_info)
+                       is_mock_location, is_rooted, challenge_error, device_info, ip)
 
     # 5) Liveness passiva + reconhecimento facial.
     selfie_bytes = await selfie.read()
@@ -157,10 +224,10 @@ async def check_in(
     if face.liveness_score < settings.LIVENESS_THRESHOLD:
         return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
                        is_mock_location, is_rooted,
-                       f"Prova de vida falhou ({face.reason or 'liveness baixo'})", device_info)
+                       f"Prova de vida falhou ({face.reason or 'liveness baixo'})", device_info, ip)
     if face.match_score < settings.FACE_MATCH_THRESHOLD:
         return _reject(db, user, site, ctype, latitude, longitude, accuracy_m, dist,
-                       is_mock_location, is_rooted, "Rosto não confere com o cadastro", device_info)
+                       is_mock_location, is_rooted, "Rosto não confere com o cadastro", device_info, ip)
 
     # 6) Aprovado — persiste. NÃO guardamos a selfie (minimização LGPD), só os scores.
     ev = CheckEvent(
@@ -168,15 +235,20 @@ async def check_in(
         latitude=latitude, longitude=longitude, accuracy_m=accuracy_m, distance_m=dist,
         is_mock_location=False, is_rooted=False,
         liveness_score=face.liveness_score, face_match_score=face.match_score,
-        device_info=device_info, client_timestamp=client_timestamp,
+        device_info=device_info, client_ip=ip, client_timestamp=client_timestamp,
     )
     db.add(ev)
     db.flush()
 
     shift_id = None
     if ctype == CheckType.checkin:
-        shift = Shift(user_id=user.id, site_id=site.id, status=ShiftStatus.active, started_at=now)
-        db.add(shift)
+        if scheduled_shift is not None:      # ativa o turno agendado (#8)
+            scheduled_shift.status = ShiftStatus.active
+            scheduled_shift.started_at = now
+            shift = scheduled_shift
+        else:                                # sem escala: turno ad-hoc
+            shift = Shift(user_id=user.id, site_id=site.id, status=ShiftStatus.active, started_at=now)
+            db.add(shift)
         db.flush()
         ev.shift_id = shift.id
         shift_id = shift.id
