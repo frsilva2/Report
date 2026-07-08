@@ -1,7 +1,7 @@
 """Schemas de entrada/saída (Pydantic v2)."""
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 # ---- Auth ----
@@ -13,7 +13,7 @@ class Token(BaseModel):
 class UserOut(BaseModel):
     id: int
     name: str
-    email: EmailStr
+    email: str
     role: str
 
     class Config:

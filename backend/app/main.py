@@ -41,6 +41,15 @@ def health():
     return {"status": "ok", "env": settings.ENV}
 
 
+@app.get("/api/config")
+def client_config():
+    """Config visível ao front (o que muda o comportamento do cliente)."""
+    return {
+        "app_name": settings.APP_NAME,
+        "require_liveness_challenge": settings.REQUIRE_LIVENESS_CHALLENGE,
+    }
+
+
 # Serve o webapp PoC (../webapp) em /app quando presente.
 try:
     app.mount("/app", StaticFiles(directory="../webapp", html=True), name="webapp")

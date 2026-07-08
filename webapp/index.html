@@ -2,64 +2,96 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WFM — Check-in de Campo (PoC)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <title>WFM · Ponto Seguro</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="app">
-    <h1>WFM · Check-in</h1>
-    <p class="warn">
-      ⚠️ PoC web: o navegador <b>não detecta Fake GPS</b> nem roda o homem-morto
-      confiável em background. A validação forte é server-side; garantias completas
-      exigem o app nativo (fase 2).
-    </p>
+  <!-- Toast global -->
+  <div id="toast" class="toast"></div>
 
-    <!-- Login -->
-    <section id="loginCard" class="card">
-      <h2>Entrar</h2>
-      <input id="email" placeholder="email" value="guarda@wfm.local" />
-      <input id="password" type="password" placeholder="senha" value="senha123" />
-      <button id="loginBtn">Entrar</button>
+  <!-- ===== LOGIN ===== -->
+  <section id="loginView" class="view login">
+    <div class="brand">
+      <div class="logo">🛡️</div>
+      <h1>Ponto Seguro</h1>
+      <p class="sub">Gestão de força de trabalho</p>
+    </div>
+    <form id="loginForm" class="card form" autocomplete="on">
+      <label>E-mail</label>
+      <input id="email" type="email" inputmode="email" placeholder="voce@empresa.com" value="guarda@wfm.local" />
+      <label>Senha</label>
+      <input id="password" type="password" placeholder="••••••••" value="senha123" />
+      <button id="loginBtn" type="submit" class="btn primary block">Entrar</button>
       <div id="loginMsg" class="msg"></div>
-    </section>
+    </form>
+    <p class="foot">Conexão segura · dados protegidos (LGPD)</p>
+  </section>
 
-    <!-- Check-in -->
-    <section id="mainCard" class="card hidden">
-      <div class="row">
-        <span id="who"></span>
-        <button id="logoutBtn" class="ghost">sair</button>
-      </div>
-
-      <label>Posto</label>
-      <select id="siteSelect"></select>
-
-      <div class="video-wrap">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="canvas" class="hidden"></canvas>
-        <div id="challengeBox" class="challenge hidden">
-          <span id="challengeMsg"></span>
+  <!-- ===== APP ===== -->
+  <section id="appView" class="view app hidden">
+    <header class="topbar">
+      <div class="user">
+        <div id="avatar" class="avatar">?</div>
+        <div class="who">
+          <strong id="userName">—</strong>
+          <span id="userRole" class="pill">—</span>
         </div>
       </div>
+      <button id="logoutBtn" class="icon-btn" title="Sair">⏻</button>
+    </header>
 
-      <div id="geo" class="geo">📍 obtendo localização…</div>
-
-      <div class="row">
-        <button id="checkinBtn">✅ Check-in</button>
-        <button id="checkoutBtn" class="ghost">Check-out</button>
+    <main class="content">
+      <!-- Estágio da câmera -->
+      <div class="stage">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas" class="hidden"></canvas>
+        <div class="frame-guide"></div>
+        <div id="challengeOverlay" class="challenge hidden">
+          <div class="challenge-inner">
+            <div id="challengeIcon" class="challenge-icon">🟢</div>
+            <div id="challengeMsg">Prova de vida</div>
+            <div id="challengeTimer" class="challenge-timer"></div>
+          </div>
+        </div>
+        <div id="stageBadge" class="stage-badge">● ao vivo</div>
       </div>
-      <button id="panicBtn" class="panic">🚨 PÂNICO</button>
 
-      <div id="result" class="msg"></div>
-
-      <!-- Homem-morto -->
-      <div id="deadman" class="deadman hidden">
-        <b>🟢 Você está alerta?</b>
-        <button id="ackBtn">Estou aqui</button>
-        <span id="deadmanTimer"></span>
+      <!-- Seleção de posto + GPS -->
+      <div class="card compact">
+        <label class="mini">Posto</label>
+        <select id="siteSelect"></select>
+        <div id="geo" class="geo"><span class="dot"></span> obtendo localização…</div>
       </div>
-    </section>
-  </main>
+
+      <!-- Resultado -->
+      <div id="result" class="result hidden"></div>
+    </main>
+
+    <!-- Barra de ação inferior -->
+    <nav class="actionbar">
+      <button id="checkoutBtn" class="btn ghost">Check-out</button>
+      <button id="checkinBtn" class="btn primary grow">✓ Check-in</button>
+      <button id="panicBtn" class="fab-panic" title="Pânico">🚨</button>
+    </nav>
+  </section>
+
+  <!-- ===== HOMEM-MORTO (modal) ===== -->
+  <div id="deadmanModal" class="modal hidden">
+    <div class="sheet">
+      <div class="sheet-icon">🟢</div>
+      <h2>Você está alerta?</h2>
+      <p>Confirme que está tudo bem no seu posto.</p>
+      <div id="deadmanTimer" class="big-timer">—</div>
+      <button id="ackBtn" class="btn primary block">Estou aqui</button>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
