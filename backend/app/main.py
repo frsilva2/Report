@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db.session import Base, engine
-from app.api.routes import auth, checkin, deadman, panic, shifts, sites, sync, telemetry
+from app.api.routes import admin, auth, checkin, deadman, panic, shifts, sites, sync, telemetry
 from app.services.deadman import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -32,7 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (auth, sites, shifts, checkin, deadman, panic, telemetry, sync):
+for r in (auth, sites, shifts, checkin, deadman, panic, telemetry, sync, admin):
     app.include_router(r.router)
 
 
@@ -50,8 +50,9 @@ def client_config():
     }
 
 
-# Serve o webapp PoC (../webapp) em /app quando presente.
-try:
-    app.mount("/app", StaticFiles(directory="../webapp", html=True), name="webapp")
-except Exception:  # noqa: BLE001 — diretório pode não existir em alguns deploys
-    pass
+# Serve o webapp do funcionário (/app) e o painel da central (/panel).
+for _path, _dir, _name in (("/app", "../webapp", "webapp"), ("/panel", "../panel", "panel")):
+    try:
+        app.mount(_path, StaticFiles(directory=_dir, html=True), name=_name)
+    except Exception:  # noqa: BLE001 — diretório pode não existir em alguns deploys
+        pass

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WFM · Central</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="panel.css" />
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <!-- LOGIN -->
+  <section id="loginView" class="login">
+    <form id="loginForm" class="card">
+      <div class="brand"><span class="logo">🛡️</span><h1>Central de Monitoramento</h1></div>
+      <label>E-mail</label>
+      <input id="email" type="text" value="operador@wfm.local" />
+      <label>Senha</label>
+      <input id="password" type="password" value="senha123" />
+      <button id="loginBtn" class="btn primary block" type="submit">Entrar</button>
+      <div id="loginMsg" class="msg"></div>
+    </form>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section id="dashView" class="dash hidden">
+    <header class="topbar">
+      <div class="brand-sm"><span>🛡️</span><strong>WFM Central</strong></div>
+      <div class="right">
+        <span id="liveDot" class="live">● ao vivo</span>
+        <span id="opName" class="muted"></span>
+        <button id="logoutBtn" class="icon-btn">⏻</button>
+      </div>
+    </header>
+
+    <div class="kpis">
+      <div class="kpi"><span class="k-label">Turnos ativos</span><span id="kActive" class="k-val">—</span></div>
+      <div class="kpi danger"><span class="k-label">Pânicos abertos</span><span id="kPanic" class="k-val">—</span></div>
+      <div class="kpi warn"><span class="k-label">Homem-morto perdido</span><span id="kMissed" class="k-val">—</span></div>
+      <div class="kpi"><span class="k-label">Check-ins 24h</span><span id="kCheck" class="k-val">—</span></div>
+    </div>
+
+    <div class="grid">
+      <div class="card map-card">
+        <div class="card-h">Mapa de postos & check-ins</div>
+        <div id="map"></div>
+        <div id="mapFallback" class="map-fallback hidden">Mapa indisponível (sem internet no ambiente).</div>
+      </div>
+
+      <div class="card feed-card">
+        <div class="card-h">🚨 Alertas ativos</div>
+        <div id="alerts" class="alerts"><div class="empty">Sem alertas.</div></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-h">Últimos registros de ponto</div>
+        <div class="table-wrap"><table id="eventsTbl">
+          <thead><tr><th>Hora</th><th>Funcionário</th><th>Posto</th><th>Tipo</th><th>Status</th><th>Motivo/Scores</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Cadastro</div>
+        <form id="siteForm" class="mini-form">
+          <strong>Novo posto (geofence)</strong>
+          <input id="sName" placeholder="Nome do posto" />
+          <div class="row3">
+            <input id="sLat" placeholder="latitude" />
+            <input id="sLon" placeholder="longitude" />
+            <input id="sRad" placeholder="raio (m)" value="150" />
+          </div>
+          <button class="btn ghost" type="submit">Adicionar posto</button>
+        </form>
+        <form id="shiftForm" class="mini-form">
+          <strong>Agendar turno</strong>
+          <select id="shUser"></select>
+          <select id="shSite"></select>
+          <div class="row2">
+            <input id="shStart" type="datetime-local" />
+            <input id="shEnd" type="datetime-local" />
+          </div>
+          <button class="btn ghost" type="submit">Agendar</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>

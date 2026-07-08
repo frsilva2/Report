@@ -134,6 +134,13 @@ com a chave pública do Serpro.
 - App recebe push/notificação e tem uma **janela (ex.: 2 min)** para dar `ack`.
 - O **scheduler no servidor** (`_sweep`) marca como `missed` e **dispara o webhook** se não houver ack — independente do app estar vivo. Ver `services/deadman.py`.
 
+### 4.3b Painel da central (`/panel`)
+Dashboard operador/admin (RBAC via `require_operator`) que consome `/api/admin/*`:
+- **KPIs**: turnos ativos, pânicos abertos, homem-morto perdido, check-ins 24h.
+- **Mapa** (Leaflet + OpenStreetMap): postos com círculos de geofence + marcadores de check-in (verde/vermelho).
+- **Alertas em tempo real**: pânico e homem-morto perdido, com polling em `/api/admin/live` (WebSocket é evolução futura); botão de resolver pânico.
+- **Feed de eventos** de ponto (aprovados/rejeitados com scores/motivo/IP) e **cadastro** de posto/turno.
+
 ### 4.4 Retaguarda
 - **Offline**: app guarda check-ins criptografados (SQLCipher) e reenvia em `/api/sync/offline`; o servidor **revalida** cada um (não confia no que foi aprovado offline).
 - **Pânico**: `/api/panic` grava e dispara webhook imediato com geolocalização.

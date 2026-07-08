@@ -25,12 +25,21 @@ backend/          API FastAPI
     db/           sessão SQLAlchemy
     models/       modelos de dados
     schemas/      Pydantic (I/O)
-    services/     geofencing, liveness, deadman, webhook
-    api/routes/   auth, sites, checkin, deadman, panic, telemetry, sync
+    services/     geofencing, liveness, deepface, datavalid, deadman,
+                  face_liveness (desafio), geoip, webhook
+    api/routes/   auth, sites, shifts, checkin, deadman, panic, telemetry,
+                  sync, admin (painel)
   seed.py         dados de exemplo
-webapp/           cliente PoC (HTML/JS): login + GPS + selfie + check-in
+  test_*.py       datavalid, antifraude, e2e (webapp) e panel (Playwright)
+webapp/           app do funcionário (mobile-first PWA): login + GPS + selfie
+                  + desafio de movimento + check-in + pânico + homem-morto
+panel/            painel da central: mapa (Leaflet), KPIs, alertas em tempo
+                  real (pânico/homem-morto), eventos, cadastro de posto/turno
 docs/             arquitetura
 ```
+
+- **App do funcionário:** `http://localhost:8000/app/`  (login `guarda@wfm.local` / `senha123`)
+- **Painel da central:** `http://localhost:8000/panel/`  (login `operador@wfm.local` / `senha123`)
 
 ## Rodar localmente (PoC)
 
@@ -59,6 +68,15 @@ TOKEN=$(curl -s -X POST localhost:8000/api/auth/login \
 curl -s -X POST localhost:8000/api/checkin -H "Authorization: Bearer $TOKEN" \
   -F site_id=1 -F type=checkin -F latitude=-23.561414 -F longitude=-46.655881 \
   -F selfie=@qualquer_imagem.jpg
+```
+
+### Testes automatizados
+```bash
+python test_datavalid.py     # adaptador Serpro Datavalid (HTTP simulado)
+python test_antifraud.py     # cruzamento GPS x IP (#5)
+pip install playwright       # E2E de navegador (usa o Chromium do ambiente)
+BASE_URL=http://localhost:8000 python test_e2e.py        # app do funcionário
+BASE_URL=http://localhost:8000 python test_panel_e2e.py  # painel da central
 ```
 
 ### Testar o homem-morto rápido
@@ -96,6 +114,22 @@ Pacotes recomendados:
 - Background/homem-morto: `flutter_foreground_task`, `flutter_local_notifications` + FCM
 - Offline criptografado: `sqflite_sqlcipher`, `flutter_secure_storage`
 - Anti-fraude: `safe_device` (mock/root) + Play Integrity / App Attest
+
+## Status do projeto
+
+**Pronto e testado (Fase 1 — webapp):**
+- ✅ Geofencing server-side + anti-fake-GPS em camadas (mock, plausibilidade, GPS×IP, gate de qualidade)
+- ✅ Reconhecimento facial plugável (stub / DeepFace self-hosted / Serpro Datavalid / AWS) + **liveness ativa por desafio de movimento** (validada no servidor)
+- ✅ Sensor de homem-morto (30 min ± jitter) com webhook disparado pelo servidor
+- ✅ Retaguarda: sync offline (revalidado), botão de pânico, telemetria
+- ✅ Janela de turno + anomalia (1 check-in ativo por vez) + auditoria com IP
+- ✅ **App do funcionário** mobile-first (PWA) e **painel da central** (mapa + alertas em tempo real)
+- ✅ Testes: unitários (Datavalid, anti-fraude) e E2E de navegador (app + painel via Playwright)
+
+**Fase 2 (app nativo Flutter/APK) — para garantias fortes:**
+- ⏭️ Attestation (Play Integrity / App Attest) contra injeção de câmera/deepfake
+- ⏭️ Detecção nativa de Mock Location e background confiável do homem-morto
+- ⏭️ Fila offline **criptografada** no dispositivo (o backend `/api/sync/offline` já está pronto)
 
 ## Conformidade
 
